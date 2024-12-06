@@ -1,14 +1,14 @@
 #include <rclcpp/rclcpp.hpp>
 #include <image_transport/image_transport.hpp>
 #include <cv_bridge/cv_bridge.h>
-#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <opencv2/opencv.hpp>
 #include <hikvision_api/utils.h>
 #include <hikvision_api/timer.h>
 #include <thread>
 
-// Convert and publish the image
-void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub, FrameInfo *pframe_info)
+// Convert and publish the image as CompressedImage
+void publishCompressedImage(MV_FRAME_OUT *stImageInfo, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr &image_pub, FrameInfo *pframe_info)
 {
     // Step 1: Convert Hikvision image to OpenCV Mat
     cv::Mat img;
@@ -26,22 +26,30 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
         return;
     }
 
-    // Step 2: Convert OpenCV Mat to sensor_msgs/Image using cv_bridge
-    auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
+    // Step 2: Encode the image using OpenCV compression
+    std::vector<uchar> compressed_buffer;
+    std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY, 90}; // Set JPEG quality to 90
+    cv::imencode(".jpg", img, compressed_buffer, compression_params);
 
+    // Step 3: Create a CompressedImage message
+    auto msg = std::make_shared<sensor_msgs::msg::CompressedImage>();
+    msg->format = "jpeg"; // Set format to JPEG
+
+    // Populate the header using FrameInfo attributes
     const uint64_t timestamp_nano = pframe_info->getTimestampNano();
     const unsigned int frame_id = pframe_info->getFrameID();
-
-    // Step 3: Populate the header with FrameInfo attributes
     msg->header.stamp = rclcpp::Time(static_cast<uint32_t>(timestamp_nano / 1000000000), static_cast<uint32_t>(timestamp_nano % 1000000000));
     msg->header.frame_id = std::to_string(frame_id);
 
-    // Step 4: Publish the image message
-    image_pub.publish(msg);
+    // Copy the compressed data into the message
+    msg->data = std::move(compressed_buffer);
+
+    // Step 4: Publish the CompressedImage message
+    image_pub->publish(*msg);
 }
 
-// Thread function to continuously capture and publish images
-void pop_thread(void *handle, image_transport::Publisher &image_pub)
+// Thread function to continuously capture and publish compressed images
+void pop_thread(void *handle, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr &image_pub)
 {
     while (rclcpp::ok())
     {
@@ -50,7 +58,7 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
         {
             FrameInfo *frame_info = get_frame_info(&(frame->stFrameInfo));
             print_frame_info(frame, true);
-            publishImage(frame, image_pub, frame_info);
+            publishCompressedImage(frame, image_pub, frame_info);
             delete frame;
             delete frame_info;
         }
@@ -58,7 +66,7 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
 }
 
 // Camera work function
-void camera_work(unsigned int idx, double freq, uint64_t sync_point, image_transport::Publisher &image_pub)
+void camera_work(unsigned int idx, double freq, uint64_t sync_point, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr &image_pub)
 {
     Timer timer(sync_point, freq);
 
@@ -95,40 +103,33 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, image_trans
     close_device(cam);
 }
 
-
 class ImagePublisherNode : public rclcpp::Node
 {
 public:
-  ImagePublisherNode() : Node("hikvision_image_publisher")
-  {
-    // Create a shared_ptr to this node
-    auto node_shared_ptr = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node*) {});
+    ImagePublisherNode() : Node("hikvision_image_publisher")
+    {
+        // Declare and get parameters
+        declare_parameter<std::string>("image_topic", "/camera/image_raw");
+        get_parameter("image_topic", image_topic_);
 
-    // Initialize image_transport with the shared_ptr
-    image_transport::ImageTransport it(node_shared_ptr);
+        RCLCPP_INFO(this->get_logger(), "Image Topic: %s", image_topic_.c_str());
 
-    // Declare and get parameters
-    declare_parameter<std::string>("image_topic", "/camera/image_raw");
-    get_parameter("image_topic", image_topic_);
+        // Create a publisher for CompressedImage messages
+        image_pub_ = this->create_publisher<sensor_msgs::msg::CompressedImage>(image_topic_, 10);
 
-    RCLCPP_INFO(this->get_logger(), "Image Topic: %s", image_topic_.c_str());
-
-    // Advertise the image topic
-    image_pub_ = it.advertise(image_topic_, 1);
-
-    RCLCPP_INFO(this->get_logger(), "Starting camera work...");
-    camera_work(0, 20.0, 10000000, image_pub_);
-  }
+        RCLCPP_INFO(this->get_logger(), "Starting camera work...");
+        camera_work(0, 20.0, 10000000, image_pub_);
+    }
 
 private:
-  std::string image_topic_;
-  image_transport::Publisher image_pub_;
+    std::string image_topic_;
+    rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr image_pub_;
 };
 
 int main(int argc, char **argv)
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ImagePublisherNode>());
-  rclcpp::shutdown();
-  return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<ImagePublisherNode>());
+    rclcpp::shutdown();
+    return 0;
 }
