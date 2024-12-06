@@ -123,12 +123,6 @@ public:
 private:
   std::string image_topic_;
   image_transport::Publisher image_pub_;
-
-  // Convert and publish the image function remains unchanged
-
-  // Camera work function remains unchanged
-
-  // Thread function to continuously capture and publish images remains unchanged
 };
 
 int main(int argc, char **argv)
