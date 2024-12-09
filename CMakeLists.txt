@@ -30,10 +30,11 @@ find_library(MVCAMERA_LIBRARY MvCameraControl PATHS $ENV{MVCAM_COMMON_RUNENV}/64
 # Include directories for Hikvision API and other dependencies
 include_directories(
   /usr/local/include
+  ./include
 )
 
 # Declare the executable
-add_executable(image_publisher src/image_publisher.cpp)
+add_executable(image_publisher src/image_publisher.cpp src/utils.cpp)
 
 # Use ament_target_dependencies to link dependencies
 ament_target_dependencies(image_publisher
@@ -60,5 +61,8 @@ endif()
 install(TARGETS image_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME})
+
 
 ament_package()
