@@ -1,7 +1,6 @@
 #include "utils.h"
 
-
-void camera_work(unsigned int idx, double freq, uint64_t sync_point,float ex_time ,image_transport::Publisher &image_pub)
+void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_time, image_transport::Publisher &image_pub)
 {
     Timer timer(sync_point, freq);
 
@@ -18,28 +17,43 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point,float ex_tim
     set_pixel_format(cam, PixelType_Gvsp_BGR8_Packed);
     turn_on_IEEE1588(cam);
     wait_until_slave(cam);
-    
-    set_trigger_mode_on(cam);
-    set_trigger_source_to_action(cam);
-    set_action_keys(cam);
-    start_grabbing(cam);
 
-    std::thread capture_thread(pop_thread, cam, std::ref(image_pub));
-    capture_thread.detach();
+    // todo: launch lidar
+    pid_t pid = fork();
 
-    timer.syncToFirstInterval();
-
-    while (rclcpp::ok())
+    if (pid < 0)
     {
-        issue_action_command();
-        timer.syncToNextInterval();
+        std::cerr << "Fork failed!" << std::endl;
+        return;
     }
+    else if (pid == 0)
+    { // 子进程:
+        execl("/bin/bash", "bash", "lidar.launch", (char *)nullptr);
+        std::cerr << "Execution failed!" << std::endl;
+        _exit(1);
+    }
+    else
+    {
+        set_trigger_mode_on(cam);
+        set_trigger_source_to_action(cam);
+        set_action_keys(cam);
+        start_grabbing(cam);
 
-    stop_grabbing(cam);
-    close_device(cam);
+        std::thread capture_thread(pop_thread, cam, std::ref(image_pub));
+        capture_thread.detach();
+
+        timer.syncToFirstInterval();
+
+        while (rclcpp::ok())
+        {
+            issue_action_command();
+            timer.syncToNextInterval();
+        }
+
+        stop_grabbing(cam);
+        close_device(cam);
+    }
 }
-
-
 
 void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub, FrameInfo *pframe_info)
 {
@@ -73,8 +87,6 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
     image_pub.publish(msg);
 }
 
-
-
 void pop_thread(void *handle, image_transport::Publisher &image_pub)
 {
     while (rclcpp::ok())
@@ -90,3 +102,4 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
         }
     }
 }
+

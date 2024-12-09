@@ -9,6 +9,11 @@
 #include <opencv2/opencv.hpp>
 #include <thread>
 #include <cv_bridge/cv_bridge.h>
+#include <iostream>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <chrono>
 
 
 /**
