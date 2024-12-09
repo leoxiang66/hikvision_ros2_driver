@@ -34,7 +34,7 @@ cd hik_ws/src/hikvision_ros2_driver
 
 
 ```sh
-ros2 run hikvision_ros2_driver image_publisher
+ros2 launch hikvision_ros2_driver launch.py
 ```
 
 ---
