@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 
 
 params = [
-    {'exposure_time': 15000.0}, 
+    {'exposure_time': 15000}, 
     {'frequency': 20},
     {'sync_point': 10000000}, # wait until the next `sync_point`
 ]

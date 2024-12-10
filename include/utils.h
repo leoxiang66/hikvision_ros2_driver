@@ -15,7 +15,6 @@
 #include <sys/wait.h>
 #include <chrono>
 
-
 /**
  * @brief Performs camera operations based on the provided parameters.
  *
@@ -24,12 +23,10 @@
  * sync point. The function may also handle exposure time settings.
  *
  * @param idx The index of the camera to operate on.
- * @param freq The frequency at which to capture images, in Hertz.
- * @param sync_point A timestamp indicating the synchronization point for image capture.
  * @param ex_time The exposure time for the camera, in seconds.
  * @param image_pub A reference to the image transport publisher used to publish captured images.
  */
-void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_time, image_transport::Publisher &image_pub);
+void camera_setup(unsigned int idx, float ex_time, image_transport::Publisher &image_pub);
 
 /**
  * @brief Publishes an image frame to the specified image transport publisher.
@@ -57,5 +54,3 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
 void pop_thread(void *handle, image_transport::Publisher &image_pub);
 
 #endif // !HIK_UTILS_H
-
-

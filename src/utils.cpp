@@ -1,8 +1,8 @@
 #include "utils.h"
 
-void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_time, image_transport::Publisher &image_pub)
+void camera_setup(unsigned int idx, float ex_time, image_transport::Publisher &image_pub)
 {
-    Timer timer(sync_point, freq);
+    
 
     void *cam = init_SDK(idx);
     if (cam == NULL)
@@ -18,42 +18,27 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
     turn_on_IEEE1588(cam);
     wait_until_slave(cam);
 
-    // todo: launch lidar
-    pid_t pid = fork();
+    set_trigger_mode_on(cam);
+    set_trigger_source_to_action(cam);
+    set_action_keys(cam);
+    start_grabbing(cam);
 
-    if (pid < 0)
-    {
-        std::cerr << "Fork failed!" << std::endl;
-        return;
-    }
-    else if (pid == 0)
-    { // 子进程:
-        execl("/bin/bash", "bash", "lidar.launch", (char *)nullptr);
-        std::cerr << "Execution failed!" << std::endl;
-        _exit(1);
-    }
-    else
-    {
-        set_trigger_mode_on(cam);
-        set_trigger_source_to_action(cam);
-        set_action_keys(cam);
-        start_grabbing(cam);
+    std::thread capture_thread(pop_thread, cam, std::ref(image_pub));
+    capture_thread.detach();
 
-        std::thread capture_thread(pop_thread, cam, std::ref(image_pub));
-        capture_thread.detach();
+    // timer.syncToFirstInterval();
 
-        timer.syncToFirstInterval();
+    // while (rclcpp::ok())
+    // {
+    //     issue_action_command();
+    //     timer.syncToNextInterval();
+    // }
 
-        while (rclcpp::ok())
-        {
-            issue_action_command();
-            timer.syncToNextInterval();
-        }
-
-        stop_grabbing(cam);
-        close_device(cam);
-    }
+    // stop_grabbing(cam);
+    // close_device(cam);
 }
+
+
 
 void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub, FrameInfo *pframe_info)
 {
@@ -102,4 +87,3 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
         }
     }
 }
-
