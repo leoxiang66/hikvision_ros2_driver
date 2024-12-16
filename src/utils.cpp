@@ -55,8 +55,10 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
     }
 }
 
-void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub, FrameInfo *pframe_info)
+void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub)
 {
+    printf("Time before step 1: ");
+    print_current_time();
     // Step 1: Convert Hikvision image to OpenCV Mat
     cv::Mat img;
     if (stImageInfo->stFrameInfo.enPixelType == PixelType_Gvsp_BGR8_Packed)
@@ -73,18 +75,27 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
         return;
     }
 
+    printf("Time before step 2: ");
+    print_current_time();
     // Step 2: Convert OpenCV Mat to sensor_msgs/Image using cv_bridge
     auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
 
-    const uint64_t timestamp_nano = pframe_info->getTimestampNano();
-    const unsigned int frame_id = pframe_info->getFrameID();
+    const uint64_t timestamp_nano = combine_high_low(stImageInfo->stFrameInfo.nDevTimeStampHigh, stImageInfo->stFrameInfo.nDevTimeStampLow);
+    const unsigned int frame_id = stImageInfo->stFrameInfo.nFrameNum;
 
+    printf("Time before step 3: ");
+    print_current_time();
     // Step 3: Populate the header with FrameInfo attributes
     msg->header.stamp = rclcpp::Time(static_cast<uint32_t>(timestamp_nano / 1000000000), static_cast<uint32_t>(timestamp_nano % 1000000000));
     msg->header.frame_id = std::to_string(frame_id);
 
+    printf("Time before step 4: ");
+    print_current_time();
     // Step 4: Publish the image message
     image_pub.publish(msg);
+
+    printf("Time after step 4: ");
+    print_current_time();
 }
 
 void pop_thread(void *handle, image_transport::Publisher &image_pub)
@@ -94,12 +105,11 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
         auto frame = pop_image_buffer(handle, 1, false);
         if (frame != NULL)
         {
-            FrameInfo *frame_info = get_frame_info(&(frame->stFrameInfo));
-            print_frame_info(frame, true);
-            publishImage(frame, image_pub, frame_info);
+            // FrameInfo *frame_info = get_frame_info(&(frame->stFrameInfo));
+            // print_frame_info(frame, true);
+            publishImage(frame, image_pub);
             delete frame;
-            delete frame_info;
+            // delete frame_info;
         }
     }
 }
-

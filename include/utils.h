@@ -31,6 +31,8 @@
  */
 void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_time, image_transport::Publisher &image_pub);
 
+
+
 /**
  * @brief Publishes an image frame to the specified image transport publisher.
  *
@@ -40,9 +42,8 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
  *
  * @param stImageInfo Pointer to the structure containing image frame output information.
  * @param image_pub A reference to the image transport publisher used to publish the image.
- * @param pframe_info Pointer to additional frame information that may be needed for processing.
  */
-void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub, FrameInfo *pframe_info);
+void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_pub);
 
 /**
  * @brief Thread function for processing image data and publishing it.
