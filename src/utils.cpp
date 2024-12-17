@@ -14,7 +14,7 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
     set_exposure_auto_off(cam);
     set_exposure_time(cam, ex_time);
     get_exposure_time(cam);
-    set_pixel_format(cam, PixelType_Gvsp_BGR8_Packed);
+    set_pixel_format(cam, PixelType_Gvsp_BayerRG8);
     turn_on_IEEE1588(cam);
     wait_until_slave(cam);
 
@@ -59,15 +59,20 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
 {
     printf("Time before step 1: ");
     print_current_time();
+    MV_FRAME_OUT_INFO_EX& stFrameInfo = stImageInfo->stFrameInfo;
     // Step 1: Convert Hikvision image to OpenCV Mat
     cv::Mat img;
     if (stImageInfo->stFrameInfo.enPixelType == PixelType_Gvsp_BGR8_Packed)
     {
         img = cv::Mat(stImageInfo->stFrameInfo.nHeight, stImageInfo->stFrameInfo.nWidth, CV_8UC3, stImageInfo->pBufAddr);
     }
-    else if (stImageInfo->stFrameInfo.enPixelType == PixelType_Gvsp_Mono8)
+    else if (stImageInfo->stFrameInfo.enPixelType == PixelType_Gvsp_BayerRG8)
     {
-        img = cv::Mat(stImageInfo->stFrameInfo.nHeight, stImageInfo->stFrameInfo.nWidth, CV_8UC1, stImageInfo->pBufAddr);
+        // Create a Mat from the Bayer image buffer
+        cv::Mat bayerImg = cv::Mat(stFrameInfo.nHeight, stFrameInfo.nWidth, CV_8UC1, stImageInfo->pBufAddr);
+
+        // Convert the Bayer image to BGR format
+        cv::cvtColor(bayerImg, img, cv::COLOR_BayerRG2RGB);
     }
     else
     {
@@ -75,7 +80,7 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
         return;
     }
 
-    printf("Time before step 2: ");
+    printf("Time before step 2: "); // 1-2 ms
     print_current_time();
     // Step 2: Convert OpenCV Mat to sensor_msgs/Image using cv_bridge
     auto msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", img).toImageMsg();
@@ -96,6 +101,7 @@ void publishImage(MV_FRAME_OUT *stImageInfo, image_transport::Publisher &image_p
 
     printf("Time after step 4: ");
     print_current_time();
+    std::cout << "" << std::endl;
 }
 
 void pop_thread(void *handle, image_transport::Publisher &image_pub)
@@ -106,7 +112,7 @@ void pop_thread(void *handle, image_transport::Publisher &image_pub)
         if (frame != NULL)
         {
             // FrameInfo *frame_info = get_frame_info(&(frame->stFrameInfo));
-            // print_frame_info(frame, true);
+            print_frame_info(frame, true);
             publishImage(frame, image_pub);
             delete frame;
             // delete frame_info;
