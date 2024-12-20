@@ -13,10 +13,16 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
 
     set_exposure_auto_off(cam);
     set_exposure_time(cam, ex_time);
+    SetIntValue(cam, "Width", 1440);
+    SetIntValue(cam, "Height", 1080);
+
+    set_gamma_correction(cam, 0.3);
+
     get_exposure_time(cam);
     set_pixel_format(cam, PixelType_Gvsp_BayerRG8);
     turn_on_IEEE1588(cam);
     wait_until_slave(cam);
+
 
     // todo: launch lidar
     pid_t pid = fork();
