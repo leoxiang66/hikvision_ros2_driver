@@ -17,6 +17,7 @@ void camera_work(unsigned int idx, double freq, uint64_t sync_point, float ex_ti
     SetIntValue(cam, "Height", 1080);
 
     set_gamma_correction(cam, 0.3);
+    set_gain(cam, 23.0);
 
     get_exposure_time(cam);
     set_pixel_format(cam, PixelType_Gvsp_BayerRG8);
